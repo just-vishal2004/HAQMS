@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum QueueStatus {
+  WAITING
+  CALLING
+  COMPLETED
+  SKIPPED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(RECEPTIONIST)
+  createdAt DateTime @default(now())
+
+  doctor Doctor?
+}
+
+model Doctor {
+  id              String   @id @default(uuid())
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id])
+  name            String
+  specialization  String
+  department      String
+  consultationFee Float
+  experience      Int
+  availableFrom   String   @default("09:00")
+  availableTo     String   @default("17:00")
+  createdAt       DateTime @default(now())
+
+  appointments Appointment[]
+  queueTokens  QueueToken[]
+
+  @@index([department])
+  @@index([specialization])
+}
+
+model Patient {
+  id             String   @id @default(uuid())
+  name           String
+  email          String?
+  phoneNumber    String
+  age            Int
+  gender         String
+  medicalHistory String?
+  createdAt      DateTime @default(now())
+
+  appointments Appointment[]
+  queueTokens  QueueToken[]
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  doctorId        String
+  doctor          Doctor            @relation(fields: [doctorId], references: [id])
+  appointmentDate DateTime
+  reason          String            @default("")
+  status          AppointmentStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+
+  queueTokens QueueToken[]
+
+  @@unique([doctorId, appointmentDate])
+  @@index([doctorId, status])
+  @@index([patientId])
+}
+
+model QueueToken {
+  id            String       @id @default(uuid())
+  tokenNumber   Int
+  patientId     String
+  patient       Patient      @relation(fields: [patientId], references: [id])
+  doctorId      String
+  doctor        Doctor       @relation(fields: [doctorId], references: [id])
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  status        QueueStatus  @default(WAITING)
+  createdAt     DateTime     @default(now())
+
+  @@index([doctorId, createdAt])
+  @@index([status])
+}
