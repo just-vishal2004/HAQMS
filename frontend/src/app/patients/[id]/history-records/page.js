@@ -39,7 +39,7 @@ export default function PatientHistoryRecords() {
     };
 
     fetchPatient();
-  }, [id, token, user]);
+  }, [API_BASE_URL, id, router, token, user]);
 
   const statusIcon = (status) => {
     if (status === 'COMPLETED') return <CheckCircle className="h-4 w-4 text-teal-500" />;

@@ -1,34 +1,41 @@
 'use client';
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useCallback, useState, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const storedUser = localStorage.getItem('haqms_user');
+    if (!storedUser) return null;
+    try {
+      return JSON.parse(storedUser);
+    } catch (e) {
+      console.error('Failed to parse user details from localStorage', e);
+      localStorage.removeItem('haqms_user');
+      localStorage.removeItem('haqms_token');
+      return null;
+    }
+  });
+  const [token, setToken] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('haqms_token');
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const router = useRouter();
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem('haqms_token');
-    const storedUser = localStorage.getItem('haqms_user');
-
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error('Failed to parse user details from localStorage', e);
-        logout();
-      }
-    }
-    setLoading(false);
-  }, []);
+  const logout = useCallback(() => {
+    localStorage.removeItem('haqms_token');
+    localStorage.removeItem('haqms_user');
+    setToken(null);
+    setUser(null);
+    router.push('/login');
+  }, [router]);
 
   const login = async (email, password) => {
     setLoading(true);
@@ -89,14 +96,6 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('haqms_token');
-    localStorage.removeItem('haqms_user');
-    setToken(null);
-    setUser(null);
-    router.push('/login');
   };
 
   return (

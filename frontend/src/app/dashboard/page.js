@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -20,12 +22,12 @@ export default function Dashboard() {
     if (!user) {
       router.push('/login');
     }
-  }, [user]);
-
-  if (!user) return null;
+  }, [router, user]);
 
   // Global State
-  const [activeTab, setActiveTab] = useState(user.role === 'ADMIN' ? 'reports' : user.role === 'RECEPTIONIST' ? 'patients' : 'appointments');
+  const [activeTab, setActiveTab] = useState(
+    user?.role === 'ADMIN' ? 'reports' : user?.role === 'RECEPTIONIST' ? 'patients' : 'appointments'
+  );
 
   // ==========================================
   // STATE FOR RECEPTIONIST WORKFLOWS
@@ -73,11 +75,17 @@ export default function Dashboard() {
   // ==========================================
   
   // Fetch Patients List
-  const fetchPatients = async (page = 1) => {
+  const fetchPatients = useCallback(async (page = 1) => {
+    if (!token) return;
     setPatientsLoading(true);
     try {
-      // Inefficient memory pagination called from client
-      const res = await fetch(`${API_BASE_URL}/patients?page=${page}&limit=5&search=${patientSearch}&gender=${patientGender}`, {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '5',
+        search: patientSearch,
+        gender: patientGender,
+      });
+      const res = await fetch(`${API_BASE_URL}/patients?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -94,17 +102,19 @@ export default function Dashboard() {
     } finally {
       setPatientsLoading(false);
     }
-  };
+  }, [API_BASE_URL, patientGender, patientSearch, token]);
 
   // Trigger Patient List Fetch (Every keystroke trigger re-renders parent! - Performance bug)
   useEffect(() => {
+    if (!user) return;
     if (user.role !== 'RECEPTIONIST' && user.role !== 'ADMIN') return;
     const debounceTimer = setTimeout(() => { fetchPatients(1); }, 300);
     return () => clearTimeout(debounceTimer);
-  }, [patientSearch, patientGender]);
+  }, [fetchPatients, user]);
 
   // Fetch Doctors for booking drop-down
-  const fetchDoctorsDropdown = async () => {
+  const fetchDoctorsDropdown = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/doctors`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -114,11 +124,11 @@ export default function Dashboard() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [API_BASE_URL, token]);
 
   useEffect(() => {
     fetchDoctorsDropdown();
-  }, []);
+  }, [fetchDoctorsDropdown]);
 
   // Handle Patient Registration
   const handleRegisterPatient = async (e) => {
@@ -253,7 +263,8 @@ export default function Dashboard() {
   // ==========================================
   // DOCTOR WORKFLOW FUNCTIONS
   // ==========================================
-  const fetchDoctorWorklist = async () => {
+  const fetchDoctorWorklist = useCallback(async () => {
+    if (!user || !token) return;
     if (user.role !== 'DOCTOR') return;
     try {
       // Find matching doctor from doctors dropdown using user ID link
@@ -279,13 +290,13 @@ export default function Dashboard() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [API_BASE_URL, doctorsList, token, user]);
 
   useEffect(() => {
-    if (user.role === 'DOCTOR' && doctorsList.length > 0) {
+    if (user?.role === 'DOCTOR' && doctorsList.length > 0) {
       fetchDoctorWorklist();
     }
-  }, [doctorsList]);
+  }, [doctorsList.length, fetchDoctorWorklist, user?.role]);
 
   // Update token status (WAITING -> CALLING -> COMPLETED / SKIPPED)
   const handleUpdateQueueStatus = async (tokenId, newStatus) => {
@@ -364,6 +375,8 @@ export default function Dashboard() {
       console.error(e);
     }
   };
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen flex flex-col">

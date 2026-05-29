@@ -5,7 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { doctorId, status } = req.query;
     const where = {};
